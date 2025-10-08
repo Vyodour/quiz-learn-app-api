@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserCodeSubmission extends Model
 {
+    protected $table = 'user_code_submissions';
+
     protected $fillable = [
         'user_id',
-        'challenge_id',
+        'code_challenge_id',
         'is_passed',
         'score',
         'submitted_code',
@@ -18,16 +20,17 @@ class UserCodeSubmission extends Model
 
     protected $casts = [
         'is_passed' => 'boolean',
+        'score' => 'integer',
         'grading_log' => 'array',
     ];
+
+    public function codeChallenge(): BelongsTo
+    {
+        return $this->belongsTo(CodeChallenge::class);
+    }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function challenge(): BelongsTo
-    {
-        return $this->belongsTo(CodeChallenge::class, 'challenge_id');
     }
 }

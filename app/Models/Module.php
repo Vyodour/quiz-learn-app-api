@@ -8,12 +8,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Module extends Model
 {
-    // Semua field yang akan diisi secara massal harus didaftarkan di sini.
-    // 'title' dan 'slug' ditambahkan sesuai migrasi dan resource terbaru.
     protected $fillable = [
         'learning_path_id',
-        'title',          // Mengganti 'name'
-        'slug',           // Field baru
+        'title',
+        'slug',
         'description',
         'duration',
         'level',
@@ -28,7 +26,6 @@ class Module extends Model
 
     public function contents(): HasMany
     {
-        // Relasi contents diurutkan berdasarkan order_number
         return $this->hasMany(Content::class)->orderBy('order_number');
     }
 }

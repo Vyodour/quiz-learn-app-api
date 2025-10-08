@@ -4,6 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\LearningPathController;
+use App\Http\Controllers\ContentController;
+use App\Http\Controllers\ContentUnitController;
+use App\Http\Controllers\QuizQuestionController;
 use Illuminate\Http\Request;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -24,6 +27,12 @@ Route::prefix('learning-paths/{learningPath}/modules')->controller(ModuleControl
         Route::get('/', 'index');
     });
 
+    Route::get('/contents/{content}', [ContentController::class, 'show']);
+
+    Route::prefix('contents/{content}/units')->controller(ContentUnitController::class)->group(function () {
+        Route::get('/', 'index');
+    });
+
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/user', function (Request $request) {
@@ -33,6 +42,11 @@ Route::prefix('learning-paths/{learningPath}/modules')->controller(ModuleControl
             'roles' => $user->getRoleNames(),
         ]);
     });
+
+    Route::prefix('quizzes/{quizInformation}')->group(function () {
+    Route::get('questions', [QuizQuestionController::class, 'index'])
+        ->name('questions.index');
+});
 
     Route::middleware('role:admin')->group(function () {
 
@@ -47,5 +61,32 @@ Route::prefix('learning-paths/{learningPath}/modules')->controller(ModuleControl
             Route::patch('/{module}', 'update');
             Route::delete('/{module}', 'destroy');
         });
+
+        Route::post('/modules/{module}/contents', [ContentController::class, 'store']);
+
+        Route::prefix('contents')->controller(ContentController::class)->group(function () {
+            Route::patch('/{content}', 'update');
+            Route::delete('/{content}', 'destroy');
+        });
+
+        Route::prefix('contents/{content}/units')->controller(ContentUnitController::class)->group(function () {
+            Route::post('/', 'store');
+        });
+
+
+        Route::prefix('content-units')->controller(ContentUnitController::class)->group(function () {
+            Route::patch('/{contentUnitOrder}', 'update');
+            Route::delete('/{contentUnitOrder}', 'destroy');
+        });
+
+        Route::prefix('quizzes/{quizInformation}')->group(function () {
+    Route::prefix('questions')->group(function () {
+        Route::post('/', [QuizQuestionController::class, 'store'])->name('questions.store');
+        Route::patch('/{quizQuestion}', [QuizQuestionController::class, 'update'])->name('questions.update');
+        Route::patch('/{quizQuestion}/options', [QuizQuestionController::class, 'updateOption'])->name('questions.updateOption');
+        Route::delete('/{quizQuestion}', [QuizQuestionController::class, 'destroy'])->name('questions.destroy');
+    });
+});
+
     });
 });

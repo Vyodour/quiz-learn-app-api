@@ -6,13 +6,6 @@ use Illuminate\Http\JsonResponse;
 
 class ResponseHelper
 {
-    /**
-     * Mengembalikan respons JSON sukses dengan struktur standar.
-     * @param string $message Pesan respons.
-     * @param mixed $data Data payload (bisa berupa Model, array, atau Resource).
-     * @param string $key Kunci yang digunakan untuk data (misal: 'user', 'learning_paths').
-     * @param int $status HTTP Status Code.
-     */
     public static function success(string $message, $data = null, string $key = 'data', int $status = 200): JsonResponse
     {
         $response = [

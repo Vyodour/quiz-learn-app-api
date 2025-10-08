@@ -3,7 +3,6 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-// Impor kelas RoleMiddleware dari Spatie
 use Spatie\Permission\Middleware\RoleMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -14,10 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Mendaftarkan alias middleware untuk routing
+        $middleware->use([
+        \Illuminate\Http\Middleware\HandleCors::class,
+    ]);
         $middleware->alias([
-            'role' => RoleMiddleware::class, // Menggunakan kelas yang diimpor
-            // Anda mungkin juga ingin menambahkan ini jika diperlukan:
+            'role' => RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
         ]);
     })

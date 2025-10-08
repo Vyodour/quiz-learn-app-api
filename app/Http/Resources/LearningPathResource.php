@@ -7,12 +7,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class LearningPathResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     * Digunakan untuk menampilkan list atau ringkasan data Learning Path.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [

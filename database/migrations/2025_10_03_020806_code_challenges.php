@@ -11,14 +11,12 @@ return new class extends Migration
         Schema::create('code_challenges', function (Blueprint $table) {
             $table->id();
 
-            $table->string('title');
-            $table->enum('language', ['python', 'javascript', 'php', 'java']);
+            $table->longText('instruction_body');
+            $table->longText('initial_code')->nullable();
 
-            $table->integer('passing_score')->default(100);
-            $table->longText('instructions');
-            $table->longText('starter_code')->nullable();
+            $table->enum('language', ['python', 'javascript', 'php', 'java'])->default('python');
             $table->json('test_cases');
-
+            $table->integer('passing_score')->default(100);
             $table->timestamps();
         });
     }

@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class QuizInformation extends Model
 {
@@ -18,11 +18,11 @@ class QuizInformation extends Model
 
     public function questions(): HasMany
     {
-        return $this->hasMany(QuizQuestion::class, 'quiz_info_id');
+        return $this->hasMany(QuizQuestion::class, 'quiz_information_id');
     }
 
-    public function orderEntries(): MorphMany
+    public function contentUnitOrder(): MorphOne
     {
-        return $this->morphMany(ContentUnitOrder::class, 'ordered_unit');
+        return $this->morphOne(ContentUnitOrder::class, 'ordered_unit');
     }
 }

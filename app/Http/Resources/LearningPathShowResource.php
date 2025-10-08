@@ -8,11 +8,6 @@ use App\Http\Resources\ModuleSummaryResource;
 
 class LearningPathShowResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array (for detail view/show).
-     *
-     * @return array<string, mixed>
-     */
      public function toArray(Request $request): array
     {
         return [
@@ -24,9 +19,7 @@ class LearningPathShowResource extends JsonResource
             'is_published' => (bool) $this->is_published,
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),
 
-            // Relasi Modules: Dimuat jika di-eager load
              'modules' => $this->whenLoaded('modules', function () {
-                // Menggunakan ModuleSummaryResource yang ringan dan efisien
                 return ModuleSummaryResource::collection($this->modules);
             }),
         ];

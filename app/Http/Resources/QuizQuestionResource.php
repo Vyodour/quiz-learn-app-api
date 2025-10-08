@@ -5,15 +5,16 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class CodeChallengeResource extends JsonResource
+class QuizQuestionResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
-            'language' => $this->language,
-            'passing_score' => $this->passing_score,
-            'instructions' => $this->instruction_body,
+            'question_text' => $this->question_text,
+            'options' => $this->options,
+
+            'correct_option_index' => $this->correct_option_index,
         ];
     }
 }

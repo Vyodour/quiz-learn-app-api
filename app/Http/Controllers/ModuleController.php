@@ -13,9 +13,6 @@ use Illuminate\Validation\Rule;
 
 class ModuleController extends Controller
 {
-    /**
-     * Menampilkan daftar Modul yang terikat pada Learning Path tertentu.
-     */
     public function index(LearningPath $learningPath): JsonResponse
     {
         try {
@@ -48,9 +45,6 @@ class ModuleController extends Controller
         }
     }
 
-    /**
-     * Menyimpan Modul baru.
-     */
     public function store(Request $request): JsonResponse
     {
         $learningPathId = $request->input('learning_path_id');
@@ -77,7 +71,6 @@ class ModuleController extends Controller
         ]);
 
         try {
-            // Jika order_number tidak ada di request, hitung urutan maksimum + 1
             if (!isset($validated['order_number'])) {
                 $maxOrder = Module::where('learning_path_id', $learningPathId)->max('order_number');
                 $validated['order_number'] = $maxOrder !== null ? $maxOrder + 1 : 1;
@@ -96,9 +89,6 @@ class ModuleController extends Controller
         }
     }
 
-    /**
-     * Memperbarui Modul yang sudah ada.
-     */
     public function update(Request $request, Module $module): JsonResponse
     {
         $targetLearningPathId = $request->input('learning_path_id', $module->learning_path_id);
@@ -140,9 +130,6 @@ class ModuleController extends Controller
         }
     }
 
-    /**
-     * Menghapus Modul.
-     */
     public function destroy(Module $module): JsonResponse
     {
         try {

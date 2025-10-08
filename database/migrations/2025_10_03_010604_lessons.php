@@ -10,8 +10,10 @@ return new class extends Migration
     {
         Schema::create('lessons', function (Blueprint $table) {
             $table->id();
-            $table->string('title');
-            $table->longText('content_body');
+            $table->longText('body')->nullable(); // Materi teks/HTML/Markdown
+            $table->string('video_url')->nullable(); // Link ke video
+            $table->string('attachment_url')->nullable(); // Link ke file pendukung (PDF, PPT, dll.)
+
             $table->timestamps();
         });
     }
