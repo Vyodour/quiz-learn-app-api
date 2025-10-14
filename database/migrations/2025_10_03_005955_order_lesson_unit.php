@@ -23,6 +23,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['content_id', 'order_number']);
+
+            $table->boolean('is_premium')->default(false);
         });
     }
 
