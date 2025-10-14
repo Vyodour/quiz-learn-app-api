@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
@@ -31,5 +32,21 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+    public function subscriptions()
+{
+    return $this->hasMany(Subscription::class);
+}
+
+public function hasActiveSubscription(): bool
+{
+    return $this->subscriptions()
+        ->where('is_active', true)
+        ->whereDate('ends_at', '>', now())
+        ->exists();
+}
+public function unitProgresses(): HasMany
+    {
+        return $this->hasMany(UserUnitProgress::class);
     }
 }
