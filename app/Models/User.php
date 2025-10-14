@@ -41,7 +41,7 @@ class User extends Authenticatable
 public function hasActiveSubscription(): bool
 {
     return $this->subscriptions()
-        ->where('is_active', true)
+        ->where('status', 'active')
         ->whereDate('ends_at', '>', now())
         ->exists();
 }
