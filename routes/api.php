@@ -7,6 +7,8 @@ use App\Http\Controllers\LearningPathController;
 use App\Http\Controllers\ContentController;
 use App\Http\Controllers\ContentUnitController;
 use App\Http\Controllers\QuizQuestionController;
+use App\Http\Controllers\CodeChallenge\CodeChallengeController;
+use App\Http\Controllers\CodeChallenge\AdminCodeChallengeController;
 use Illuminate\Http\Request;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -48,6 +50,13 @@ Route::prefix('learning-paths/{learningPath}/modules')->controller(ModuleControl
         ->name('questions.index');
 });
 
+Route::prefix('/code-challenges/{challenge}')->group(function () {
+    Route::get('/', [CodeChallengeController::class, 'show']);
+    Route::post('/submit', [CodeChallengeController::class, 'submit']);
+});
+
+//Route::get('/my-submmissions', [UserCodeSubmissionController::class, 'index']);
+
     Route::middleware('role:admin')->group(function () {
 
         Route::prefix('learning-paths')->controller(LearningPathController::class)->group(function () {
@@ -87,6 +96,15 @@ Route::prefix('learning-paths/{learningPath}/modules')->controller(ModuleControl
         Route::delete('/{quizQuestion}', [QuizQuestionController::class, 'destroy'])->name('questions.destroy');
     });
 });
+Route::prefix('admin')->group(function () {
+        Route::resource('challenges', AdminCodeChallengeController::class)->except(['show']);
+        Route::prefix('submissions')->group(function () {
+            Route::get('/', [AdminCodeChallengeController::class, 'allSubmissions']);
+        Route::get('/{submission}', [AdminCodeChallengeController::class, 'showSubmission']);
+        });
 
     });
+    });
+
+
 });
