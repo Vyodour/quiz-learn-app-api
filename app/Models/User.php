@@ -45,6 +45,7 @@ public function hasActiveSubscription(): bool
         ->whereDate('ends_at', '>', now())
         ->exists();
 }
+
 public function unitProgresses(): HasMany
     {
         return $this->hasMany(UserUnitProgress::class);
