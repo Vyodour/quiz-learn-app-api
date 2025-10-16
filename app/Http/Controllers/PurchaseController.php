@@ -8,69 +8,63 @@ use App\Http\Requests\StorePurchaseRequest;
 use App\Helpers\ResponseHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Exception;
 
 class PurchaseController extends Controller
 {
-    public function __construct()
+    protected $midtransService;
+
+    public function __construct(MidtransService $midtransService)
     {
         $this->middleware('auth:sanctum');
+        $this->midtransService = $midtransService;
     }
-    
+
     public function store(StorePurchaseRequest $request): JsonResponse
     {
         $user = $request->user();
         $plan = Plan::find($request->plan_id);
 
-        if (!$plan) {
-            return ResponseHelper::error('Paket tidak ditemukan.', 404);
+        if (!$plan || !$plan->is_active) {
+            return ResponseHelper::error('Package not found!.', 404);
         }
 
         try {
             $transactionData = DB::transaction(function () use ($user, $plan, $request) {
+                $transactionCode = 'TRX-' . time() . '-' . Str::random(10);
                 $transaction = Transaction::create([
                     'user_id' => $user->id,
-                    'transaction_code' => 'TXN-' . time() . '-' . uniqid(),
+                    'transaction_code' => $transactionCode,
                     'amount' => $plan->price,
                     'currency' => 'IDR',
                     'status' => 'pending',
-                    'payment_gateway' => $request->payment_gateway,
+                    'payment_gateway' => 'Midtrans Snap',
+                    'plan_id' => $plan->id,
                 ]);
 
-                $paymentGatewayResponse = $this->callPaymentGateway($transaction, $plan, $user);
+                $midtransResult = $this->midtransService->createSnapTransaction($transaction, $plan, $user);
 
-                $transaction->gateway_response = $paymentGatewayResponse;
+                $transaction->payment_gateway_id = $midtransResult['payment_gateway_id'] ?? null;
+                $transaction->gateway_response = $midtransResult;
                 $transaction->save();
 
                 return [
-                    'transaction' => $transaction,
-                    'payment_url' => $paymentGatewayResponse['redirect_url'] ?? null,
-                    'payment_info' => $paymentGatewayResponse['info'] ?? null,
+                    'transaction_code' => $transaction->transaction_code,
+                    'payment_url' => $midtransResult['redirect_url'] ?? null,
+                    'payment_info' => $midtransResult['info'] ?? null,
                 ];
             });
 
             return ResponseHelper::success(
-                'Pembelian berhasil diinisiasi. Lanjutkan ke pembayaran.',
+                'Purchase initiated. Start the transaction.',
                 $transactionData,
                 'purchase_data',
                 201
             );
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal menginisiasi pembelian. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to purchase. Error: ' . $e->getMessage(), 500);
         }
-    }
-
-    private function callPaymentGateway(Transaction $transaction, Plan $plan, $user): array
-    {
-        return [
-            'redirect_url' => 'https://sandbox.paymentgateway.com/pay/' . $transaction->transaction_code,
-            'gateway_id' => 'GATEWAY-' . rand(1000, 9999),
-            'info' => [
-                'va_number' => '8888000' . rand(100, 999),
-                'expiry_time' => now()->addHours(2)->format('Y-m-d H:i:s'),
-                'instruction' => 'Please transfer to the VA number before expired',
-            ],
-        ];
     }
 }
