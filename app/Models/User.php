@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Subscription;
+use Illuminate\Support\Carbon;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -37,17 +39,28 @@ class User extends Authenticatable
 {
     return $this->hasMany(Subscription::class);
 }
-
+public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
 public function hasActiveSubscription(): bool
 {
     return $this->subscriptions()
         ->where('status', 'active')
-        ->whereDate('ends_at', '>', now())
+        ->where('ends_at', '>', now())
         ->exists();
 }
+public function getActiveSubscription(): ?Subscription
+    {
+        return $this->subscriptions()
+            ->where('status', 'active')
+            ->where('ends_at', '>', Carbon::now())
+            ->first();
+    }
 
 public function unitProgresses(): HasMany
     {
         return $this->hasMany(UserUnitProgress::class);
     }
+
 }
