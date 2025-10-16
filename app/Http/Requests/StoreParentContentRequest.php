@@ -21,8 +21,8 @@ class StoreParentContentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.required' => 'Judul unit konten waj  ib diisi.',
-            'title.max' => 'Judul tidak boleh melebihi 255 karakter.',
+            'title.required' => 'Content title must be filled.',
+            'title.max' => 'Title can not more than 255 character.',
         ];
     }
 }

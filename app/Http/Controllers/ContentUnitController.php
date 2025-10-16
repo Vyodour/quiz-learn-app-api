@@ -9,6 +9,7 @@ use App\Models\Lesson;
 use App\Models\QuizInformation;
 use App\Models\CodeChallenge;
 use App\Http\Requests\StoreContentRequest;
+use App\Http\Requests\UpdateContentUnitRequest;
 use App\Http\Resources\ContentUnitOrderResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -49,13 +50,13 @@ class ContentUnitController extends Controller
         $specificData = $request->order_data;
 
         if (!isset($this->contentableMap[$type])) {
-             return ResponseHelper::error('Tipe konten tidak valid.', 422);
+             return ResponseHelper::error('Content type unvalid!.', 422);
         }
 
         $ModelClass = $this->contentableMap[$type];
 
         try {
-            $result = DB::transaction(function () use ($content, $ModelClass, $specificData) {
+            $result = DB::transaction(function () use ($content, $ModelClass, $specificData, $request) {
 
                 $nextOrderNumber = ContentUnitOrder::where('content_id', $content->id)->max('order_number') + 1;
                 $contentable = $ModelClass::create($specificData);
@@ -66,6 +67,7 @@ class ContentUnitController extends Controller
                     'is_completed' => false,
                     'ordered_unit_type' => $contentable::class,
                     'ordered_unit_id' => $contentable->id,
+                    'is_premium' => $request->boolean('is_premium', false),
                 ]);
 
                 $contentUnitOrder->load('orderedUnit');
@@ -74,30 +76,34 @@ class ContentUnitController extends Controller
             });
 
             return ResponseHelper::success(
-                'Content Unit Berhasil Ditambahkan.',
+                'Content unit created.',
                 new ContentUnitOrderResource($result),
                 'content_unit',
                 201
             );
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal membuat Content Unit. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to create content unit. Error: ' . $e->getMessage(), 500);
         }
     }
 
-    public function update(Request $request, ContentUnitOrder $contentUnitOrder): JsonResponse
+    public function update(UpdateContentUnitRequest $request, ContentUnitOrder $contentUnitOrder): JsonResponse
     {
         try {
             $contentable = $contentUnitOrder->orderedUnit;
 
             if (!$contentable) {
-                return ResponseHelper::error('Unit konten detail tidak ditemukan.', 404);
+                return ResponseHelper::error('Content unit not found!.', 404);
             }
 
             $result = DB::transaction(function () use ($request, $contentUnitOrder, $contentable) {
 
                 if ($request->has('order_number')) {
                     $contentUnitOrder->update(['order_number' => $request->order_number]);
+                }
+
+                if ($request->has('is_premium')) {
+                    $contentUnitOrder->update(['is_premium' => $request->boolean('is_premium')]);
                 }
 
                 if ($request->has('order_data') && is_array($request->order_data)) {
@@ -109,13 +115,13 @@ class ContentUnitController extends Controller
             });
 
             return ResponseHelper::success(
-                'Content Unit Berhasil Diperbarui.',
+                'Content unit has been updated.',
                 new ContentUnitOrderResource($result),
                 'content_unit'
             );
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal memperbarui Content Unit. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to update content unit. Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -136,12 +142,12 @@ class ContentUnitController extends Controller
             });
 
             if ($success) {
-                return ResponseHelper::success('Content Unit Berhasil Dihapus.', null);
+                return ResponseHelper::success('Content unit deleted.', null);
             }
-            return ResponseHelper::error('Penghapusan gagal.', 500);
+            return ResponseHelper::error('Failed to delete content unit.', 500);
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal menghapus Content Unit. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to delete content unit. Error: ' . $e->getMessage(), 500);
         }
     }
 }

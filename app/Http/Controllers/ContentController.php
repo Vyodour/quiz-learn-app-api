@@ -35,7 +35,7 @@ class ContentController extends Controller
         }
     }
 
-    public function store(StoreParentContentRequest $request, Module $module): JsonResponse // Menggunakan StoreParentContentRequest
+    public function store(StoreParentContentRequest $request, Module $module): JsonResponse 
     {
         try {
             $result = DB::transaction(function () use ($request, $module) {
@@ -53,14 +53,14 @@ class ContentController extends Controller
             });
 
             return ResponseHelper::success(
-                'Content Berhasil Ditambahkan.',
+                'Content created.',
                 new ContentResource($result),
                 'content',
                 201
             );
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal membuat Content. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to create content. Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -85,13 +85,13 @@ class ContentController extends Controller
             });
 
             return ResponseHelper::success(
-                'Content Berhasil Diperbarui.',
+                'Content has been updated.',
                 new ContentResource($result),
                 'content'
             );
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal memperbarui Content. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to update content. Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -99,12 +99,12 @@ class ContentController extends Controller
     {
         try {
             if ($content->delete()) {
-                return ResponseHelper::success('Content Berhasil Dihapus.', null);
+                return ResponseHelper::success('Content deleted.', null);
             }
-            return ResponseHelper::error('Penghapusan gagal.', 500);
+            return ResponseHelper::error('Failed to delete content.', 500);
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal menghapus Content. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to delete content. Error: ' . $e->getMessage(), 500);
         }
     }
 }

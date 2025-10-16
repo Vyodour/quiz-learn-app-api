@@ -9,7 +9,7 @@ class StoreContentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user() && $this->user()->hasRole('admin');
     }
 
     public function rules(): array
@@ -19,6 +19,7 @@ class StoreContentRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'type' => ['required', 'string', Rule::in(['lesson', 'quiz', 'challenge'])],
             'order_data' => ['required', 'array'],
+            'is_premium' => ['nullable', 'boolean'],
         ];
 
         $type = $this->input('type');
@@ -65,11 +66,12 @@ class StoreContentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.required' => 'Judul unit konten wajib diisi.',
-            'type.in' => 'Tipe konten harus salah satu dari: lesson, quiz, atau challenge.',
-            'content_id.exists' => 'Content Induk yang Anda tuju tidak ditemukan.',
-            'order_data.required' => 'Data spesifik konten (order_data) wajib diisi.',
-            'order_data.content_body.required_if' => 'Lesson harus memiliki setidaknya Teks Konten, URL Video, atau URL Lampiran.'
+            'title.required' => 'Content unit title must be filled.',
+            'type.in' => 'Content unit type must be one of these: lesson, quiz, or challenge.',
+            'content_id.exists' => 'Parent content not found.',
+            'order_data.required' => 'Specific content data (order_data) must be filled.',
+            'order_data.content_body.required_if' => 'Lesson required one of the content like Text, Video URL, or File URL.',
+            'is_premium.boolean' => 'Premium status must be boolean (true or false).'
         ];
     }
 }
