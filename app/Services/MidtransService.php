@@ -15,8 +15,8 @@ class MidtransService
     {
         Config::$serverKey = config('midtrans.server_key');
         Config::$isProduction = config('midtrans.is_production');
-        Config::$isSanitized = config('midtrans.is_sanitized');
-        Config::$is3ds = config('midtrans.is_3ds');
+        Config::$isSanitized = config('midtrans.sanitise');
+        Config::$is3ds = config('midtrans.3ds');
     }
 
     public function createSnapTransaction(Transaction $transaction, Plan $plan, User $user): array
@@ -26,12 +26,12 @@ class MidtransService
         $params = [
             'transaction_details' => [
                 'order_id' => $transaction->transaction_code,
-                'gross_amount' => $transaction->amount,
+                'gross_amount' => (int) $transaction->amount,
             ],
             'item_details' => [
                 [
                     'id' => 'PLAN-' . $plan->id,
-                    'price' => $plan->price,
+                    'price' => (int) $plan->price,
                     'quantity' => 1,
                     'name' => $plan->name,
                 ]
@@ -61,6 +61,10 @@ class MidtransService
             ];
 
         } catch (Exception $e) {
+            \Log::error("MIDTRANS_SNAP_CREATION_FAILED for TRX: {$transaction->transaction_code}", [
+                'error' => $e->getMessage(),
+                'params' => $params
+            ]);
             throw new Exception("Gagal menghubungi Midtrans API: " . $e->getMessage());
         }
     }

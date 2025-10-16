@@ -13,11 +13,13 @@ class Transaction extends Model
     protected $fillable = [
         'user_id',
         'subscription_id',
+        'plan_id',
         'transaction_code',
         'amount',
         'currency',
         'status',
         'payment_gateway',
+        'payment_gateway_id',
         'paid_at',
         'gateway_response',
     ];
@@ -36,5 +38,9 @@ class Transaction extends Model
     public function subscription(): BelongsTo
     {
         return $this->belongsTo(Subscription::class);
+    }
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
     }
 }

@@ -23,19 +23,14 @@ class WebhookController extends Controller
         Config::$serverKey = config('midtrans.server_key');
     }
 
-    /**
-     * Menerima notifikasi (Webhook) dari Midtrans.
-     * Rute ini TIDAK menggunakan middleware 'auth'.
-     *
-     * @param Request $request Data notifikasi dari Midtrans.
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function midtransHandler(Request $request)
     {
+        $orderId = $request->input('order_id');
+
         try {
             $notification = new Notification();
         } catch (\Exception $e) {
-            Log::error("MIDTRANS_WEBHOOK_VERIFICATION_FAILED: " . $e->getMessage());
+            Log::error("MIDTRANS_WEBHOOK_VERIFICATION_FAILED: Order ID {$orderId} - " . $e->getMessage());
             return response()->json(['message' => 'Invalid notification signature or error in Midtrans processing.'], 403);
         }
 
@@ -50,41 +45,50 @@ class WebhookController extends Controller
             return response()->json(['message' => 'Transaction not found!'], 404);
         }
 
-        if (in_array($transaction->status, ['settlement', 'success', 'expire', 'cancel'])) {
-            return response()->json(['message' => 'Transaction already finalized.'], 200);
+        if (in_array($transaction->status, ['settlement', 'success', 'expire', 'cancel', 'denied'])) {
+             Log::info("WEBHOOK_ALREADY_FINALIZED: Order ID {$orderId} already has status: {$transaction->status}");
+             return response()->json(['message' => 'Transaction already finalized.'], 200);
         }
 
-        DB::transaction(function () use ($transaction, $transactionStatus, $fraudStatus, $notification) {
+        try {
+            DB::transaction(function () use ($transaction, $transactionStatus, $fraudStatus, $notification, $orderId) {
 
-            $updateData = [
-                'gateway_response' => json_decode(json_encode($notification->getResponse()), true),
-            ];
+                $newStatus = $transaction->status;
 
-            $newStatus = $transaction->status;
+                if ($transactionStatus === 'capture') {
+                    $newStatus = ($fraudStatus === 'accept') ? 'settlement' : 'denied';
+                } elseif ($transactionStatus === 'settlement') {
+                    $newStatus = 'settlement';
+                } elseif ($transactionStatus === 'pending') {
+                    $newStatus = 'pending';
+                } elseif (in_array($transactionStatus, ['deny', 'cancel'])) {
+                    $newStatus = 'cancel';
+                } elseif ($transactionStatus === 'expire') {
+                    $newStatus = 'expire';
+                }
 
-            if ($transactionStatus == 'capture') {
-                $newStatus = ($fraudStatus == 'accept') ? 'settlement' : 'denied';
-            } elseif ($transactionStatus == 'settlement') {
-                $newStatus = 'settlement';
-            } elseif ($transactionStatus == 'pending') {
-                $newStatus = 'pending';
-            } elseif (in_array($transactionStatus, ['deny', 'cancel'])) {
-                $newStatus = 'cancel';
-            } elseif ($transactionStatus == 'expire') {
-                $newStatus = 'expire';
-            }
+                $transaction->status = $newStatus;
+                $transaction->gateway_response = json_decode(json_encode($notification->getResponse()), true);
 
-            $transaction->update(array_merge($updateData, ['status' => $newStatus]));
+                if ($newStatus === 'settlement') {
+                    $transaction->paid_at = Carbon::now();
 
-            if ($newStatus === 'settlement') {
-                $transaction->paid_at = Carbon::now();
+                    $this->subscriptionService->activateSubscription($transaction);
+
+                    Log::info("WEBHOOK_ACTIVATED_SUBSCRIPTION: User {$transaction->user_id} - TRX: {$orderId}");
+                }
+
                 $transaction->save();
 
-                $this->subscriptionService->activateSubscription($transaction);
-                Log::info("WEBHOOK_ACTIVATED_SUBSCRIPTION: User {$transaction->user_id} - TRX: {$transaction->transaction_code}");
-            }
-        });
+                Log::info("WEBHOOK_STATUS_UPDATED: Order ID {$orderId} updated to {$newStatus}");
+            });
 
-        return response()->json(['message' => 'Notification processed successfully.'], 200);
+            return response()->json(['message' => 'Notification processed successfully.'], 200);
+
+        } catch (\Exception $e) {
+            Log::error("WEBHOOK_PROCESSING_ERROR: Fatal error in DB transaction for Order ID: {$orderId}. " . $e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['message' => 'Internal Server Error during processing. Midtrans will retry.'], 500);
+        }
     }
 }
