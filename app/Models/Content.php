@@ -24,4 +24,33 @@ class Content extends Model
     {
         return $this->hasMany(ContentUnitOrder::class, 'content_id')->orderBy('order_number');
     }
+
+    public function isCompletedByUser(User $user): bool
+    {
+        $unitIds = $this->orderedUnits()->pluck('id');
+
+        if ($unitIds->isEmpty()) {
+            return true;
+        }
+
+        $completedCount = $user->unitProgresses()
+            ->whereIn('content_unit_order_id', $unitIds)
+            ->where('is_completed', true)
+            ->count();
+
+        return $completedCount === $unitIds->count();
+    }
+
+    public function isPreviousContentCompleted(User $user): bool
+    {
+        $previousContent = Content::where('module_id', $this->module_id)
+            ->where('order_number', $this->order_number - 1)
+            ->first();
+
+        if (!$previousContent) {
+            return true;
+        }
+
+        return $previousContent->isCompletedByUser($user);
+    }
 }
