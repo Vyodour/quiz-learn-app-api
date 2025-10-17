@@ -31,6 +31,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', 'indexOrphan');
     });
 
+    Route::post('/modules/{module}/enroll', [ModuleController::class, 'enroll'])->name('modules.enroll');
+
     Route::prefix('learning-paths/{learningPath}/modules')->controller(ModuleController::class)->group(function () {
         Route::get('/', 'index');
     });

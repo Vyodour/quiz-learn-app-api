@@ -8,6 +8,8 @@ use App\Helpers\ResponseHelper;
 use App\Http\Resources\ModuleResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use App\Models\UserModuleEnrollment;
 use Exception;
 use Illuminate\Validation\Rule;
 
@@ -148,8 +150,12 @@ class ModuleController extends Controller
 
     public function enroll(Module $module): JsonResponse
     {
-        return $this->handleApiResponse(function () use ($module) {
+        try {
             $user = Auth::user();
+
+            if (!$user) {
+                return ResponseHelper::error('User not authenticated.', 401);
+            }
 
             $enrollment = UserModuleEnrollment::updateOrCreate(
                 [
@@ -162,10 +168,15 @@ class ModuleController extends Controller
             );
 
             $message = $enrollment->wasRecentlyCreated
-                       ? 'User successfully enrolled in module.'
-                       : 'User is already enrolled in module.';
+                ? 'User successfully enrolled in module.'
+                : 'User is already enrolled in module.';
 
-            return ResponseHelper::success($message, $enrollment, 'enrollment');
-        }, 'Failed to enroll in module.');
+            $statusCode = $enrollment->wasRecentlyCreated ? 201 : 200;
+
+            return ResponseHelper::success($message, $enrollment, 'enrollment', $statusCode);
+
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to enroll in module. Error: ' . $e->getMessage(), 500);
+        }
     }
 }
