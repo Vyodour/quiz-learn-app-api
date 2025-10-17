@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\ResponseHelper;
+use Illuminate\Support\Facades\Auth;
 use Exception;
 
 class ContentUnitController extends Controller
@@ -29,9 +30,9 @@ class ContentUnitController extends Controller
     {
         try {
             $orderedUnits = $content->orderedUnits()
-                                        ->with('orderedUnit')
-                                        ->orderBy('order_number')
-                                        ->get();
+                                     ->with('orderedUnit')
+                                     ->orderBy('order_number')
+                                     ->get();
 
             return ResponseHelper::success(
                 'Content Units Fetched Successfully',
@@ -41,6 +42,40 @@ class ContentUnitController extends Controller
 
         } catch (Exception $e) {
             return ResponseHelper::error('Failed to Fetch Content Units. Error: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function show(Content $content, ContentUnitOrder $orderedUnit): JsonResponse
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+             return ResponseHelper::error('Unauthorized. Please log in.', 401);
+        }
+
+        if ($orderedUnit->content_id !== $content->id) {
+            return ResponseHelper::error('Content unit does not belong to the specified content.', 404);
+        }
+
+        if (!$orderedUnit->canBeAccessedByUser($user)) {
+             return ResponseHelper::error('This is premium content and need subscription.', 403);
+        }
+
+        if (!$orderedUnit->isPreviousUnitCompleted($user)) {
+            return ResponseHelper::error('Finish the previous content to access this.', 403);
+        }
+
+        $orderedUnit->load('orderedUnit');
+
+        try {
+            return ResponseHelper::success(
+                'Content Unit Detail Fetched Successfully',
+                new ContentUnitOrderResource($orderedUnit),
+                'content_unit_detail'
+            );
+
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to Fetch Content Unit Detail. Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -63,6 +98,7 @@ class ContentUnitController extends Controller
 
                 $contentUnitOrder = ContentUnitOrder::create([
                     'content_id' => $content->id,
+                    'title' => $request->title,
                     'order_number' => $nextOrderNumber,
                     'is_completed' => false,
                     'ordered_unit_type' => $contentable::class,
@@ -87,31 +123,37 @@ class ContentUnitController extends Controller
         }
     }
 
-    public function update(UpdateContentUnitRequest $request, ContentUnitOrder $contentUnitOrder): JsonResponse
+    public function update(UpdateContentUnitRequest $request, ContentUnitOrder $orderedUnit): JsonResponse
     {
         try {
-            $contentable = $contentUnitOrder->orderedUnit;
+            $contentable = $orderedUnit->orderedUnit;
 
             if (!$contentable) {
                 return ResponseHelper::error('Content unit not found!.', 404);
             }
 
-            $result = DB::transaction(function () use ($request, $contentUnitOrder, $contentable) {
+            $result = DB::transaction(function () use ($request, $orderedUnit, $contentable) {
+
+                $updateOrderData = [];
+
+                if ($request->has('title')) {
+                    $updateOrderData['title'] = $request->title;
+                }
 
                 if ($request->has('order_number')) {
-                    $contentUnitOrder->update(['order_number' => $request->order_number]);
+                    $orderedUnit->update(['order_number' => $request->order_number]);
                 }
 
                 if ($request->has('is_premium')) {
-                    $contentUnitOrder->update(['is_premium' => $request->boolean('is_premium')]);
+                    $orderedUnit->update(['is_premium' => $request->boolean('is_premium')]);
                 }
 
                 if ($request->has('order_data') && is_array($request->order_data)) {
                     $contentable->update($request->order_data);
                 }
 
-                $contentUnitOrder->load('orderedUnit');
-                return $contentUnitOrder;
+                $orderedUnit->load('orderedUnit');
+                return $orderedUnit;
             });
 
             return ResponseHelper::success(
@@ -125,18 +167,18 @@ class ContentUnitController extends Controller
         }
     }
 
-    public function destroy(ContentUnitOrder $contentUnitOrder): JsonResponse
+    public function destroy(ContentUnitOrder $orderedUnit): JsonResponse
     {
         try {
-            $contentable = $contentUnitOrder->orderedUnit;
+            $contentable = $orderedUnit->orderedUnit;
 
-            $success = DB::transaction(function () use ($contentUnitOrder, $contentable) {
+            $success = DB::transaction(function () use ($orderedUnit, $contentable) {
 
                 if ($contentable) {
                     $contentable->delete();
                 }
 
-                $contentUnitOrder->delete();
+                $orderedUnit->delete();
 
                 return true;
             });
