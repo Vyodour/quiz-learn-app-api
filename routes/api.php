@@ -12,6 +12,7 @@ use App\Http\Controllers\CodeChallenge\AdminCodeChallengeController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\AdminPlanController;
+use App\Http\Controllers\UserProgressController;
 use Illuminate\Http\Request;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -38,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('contents/{content}/units')->controller(ContentUnitController::class)->group(function () {
         Route::get('/', 'index');
+        Route::get('/{orderedUnit}', 'show')->scopeBindings();
     });
 
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -120,6 +122,10 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         Route::resource('plans', AdminPlanController::class)->except(['index', 'show']);
+
+        Route::prefix('admin/system')->controller(UserProgressController::class)->group(function () {
+            Route::post('/reset-content-progress', 'resetAllContentProgress');
+        });
 
     });
 });
