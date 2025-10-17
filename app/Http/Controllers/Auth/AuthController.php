@@ -67,6 +67,7 @@ class AuthController extends Controller
         $user = Auth::user();
         $user->tokens()->delete();
         $token = $user->createToken('auth_token')->plainTextToken;
+        $roles = $user->getRoleNames();
 
         return response()->json([
             'message' => 'Login successful!',
@@ -75,6 +76,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'username' => $user->username,
                 'email' => $user->email,
+                'roles' => $roles,
             ],
             'token' => $token,
         ]);

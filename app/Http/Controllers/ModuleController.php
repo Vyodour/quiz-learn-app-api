@@ -145,4 +145,27 @@ class ModuleController extends Controller
             return ResponseHelper::error('Failed To Delete Module. Error: ' . $e->getMessage(), 500);
         }
     }
+
+    public function enroll(Module $module): JsonResponse
+    {
+        return $this->handleApiResponse(function () use ($module) {
+            $user = Auth::user();
+
+            $enrollment = UserModuleEnrollment::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'module_id' => $module->id,
+                ],
+                [
+                    'start_date' => now(),
+                ]
+            );
+
+            $message = $enrollment->wasRecentlyCreated
+                       ? 'User successfully enrolled in module.'
+                       : 'User is already enrolled in module.';
+
+            return ResponseHelper::success($message, $enrollment, 'enrollment');
+        }, 'Failed to enroll in module.');
+    }
 }
