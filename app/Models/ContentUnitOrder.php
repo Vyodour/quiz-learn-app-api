@@ -13,6 +13,7 @@ class ContentUnitOrder extends Model
     protected $fillable = [
         'content_id',
         'order_number',
+        'title',
         'is_completed',
         'ordered_unit_type',
         'ordered_unit_id',
@@ -21,7 +22,6 @@ class ContentUnitOrder extends Model
 
     protected $casts = [
         'is_completed' => 'boolean',
-        'is_premium' => 'boolean',
     ];
 
     public function orderedUnit(): MorphTo
@@ -32,6 +32,11 @@ class ContentUnitOrder extends Model
     public function content(): BelongsTo
     {
         return $this->belongsTo(Content::class);
+    }
+
+    public function userProgresses(): HasMany
+    {
+        return $this->hasMany(UserUnitProgress::class);
     }
 
     public function requiresSubscription(): bool
@@ -47,19 +52,24 @@ class ContentUnitOrder extends Model
     return true;
 }
 
-public function isPreviousUnitCompleted(User $user): bool
-{
-    $previousOrderUnit = ContentUnitOrder::where('content_id', $this->content_id)
-        ->where('order_number', $this->order_number - 1)
-        ->first();
+    public function isPreviousUnitCompleted(User $user): bool
+    {
+        if ($this->order_number === 1) {
+            return true;
+        }
 
-    if (!$previousOrderUnit) {
-        return true;
+        $previousUnit = ContentUnitOrder::where('content_id', $this->content_id)
+            ->where('order_number', $this->order_number - 1)
+            ->first();
+
+        if (!$previousUnit) {
+            return true;
+        }
+
+        $progress = UserUnitProgress::where('user_id', $user->id)
+            ->where('content_unit_order_id', $previousUnit->id)
+            ->first();
+
+        return (bool)($progress && $progress->is_completed);
     }
-    $progress = $user->unitProgresses()
-                         ->where('content_unit_order_id', $previousOrderUnit->id)
-                         ->first();
-
-        return $progress && $progress->is_completed;
-}
 }

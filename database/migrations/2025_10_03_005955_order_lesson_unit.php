@@ -15,8 +15,8 @@ return new class extends Migration
                 ->constrained('contents')
                 ->onDelete('cascade');
 
+            $table->string('title')->nullable();
             $table->integer('order_number')->default(1);
-            $table->boolean('is_completed')->default(false);
 
             $table->morphs('ordered_unit');
 
