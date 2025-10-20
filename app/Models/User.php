@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Subscription;
 use Illuminate\Support\Carbon;
 use Spatie\Permission\Traits\HasRoles;
@@ -58,7 +57,7 @@ public function getActiveSubscription(): ?Subscription
             ->first();
     }
 
-public function unitProgresses(): HasMany
+public function userProgresses(): HasMany
     {
         return $this->hasMany(UserUnitProgress::class);
     }

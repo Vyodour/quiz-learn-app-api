@@ -52,7 +52,7 @@ class UserProgressController extends Controller
         try {
             $totalUnits = ContentUnitOrder::count();
 
-            $completedUnitsCount = $user->unitProgresses()
+            $completedUnitsCount = $user->userProgresses()
                 ->where('is_completed', true)
                 ->count();
 
@@ -61,7 +61,7 @@ class UserProgressController extends Controller
                 : 0;
 
             $nextUnit = ContentUnitOrder::orderBy('order_number')
-                ->whereDoesntHave('unitProgresses', function ($query) use ($user) {
+                ->whereDoesntHave('userProgresses', function ($query) use ($user) {
                     $query->where('user_id', $user->id)->where('is_completed', true);
                 })
                 ->with('orderedUnit')
@@ -80,14 +80,14 @@ class UserProgressController extends Controller
                 ->where('user_id', $user->id)
                 ->avg('score') ?? 0;
             $averageQuizScore = round($averageQuizScore, 0);
-            $moduleProgress = Module::with(['contents.orderedUnits.unitProgresses' => function ($query) use ($user) {
+            $moduleProgress = Module::with(['contents.orderedUnits.userProgresses' => function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             }])
                 ->get()
                 ->map(function ($module) {
                     $totalUnits = $module->contents->flatMap(fn ($content) => $content->orderedUnits)->count();
                     $completedUnits = $module->contents->flatMap(fn ($content) => $content->orderedUnits)
-                        ->filter(fn ($unit) => $unit->unitProgresses->isNotEmpty() && $unit->unitProgresses->first()->is_completed)
+                        ->filter(fn ($unit) => $unit->userProgresses->isNotEmpty() && $unit->userProgresses->first()->is_completed)
                         ->count();
 
                     $completionPercentage = ($totalUnits > 0)
