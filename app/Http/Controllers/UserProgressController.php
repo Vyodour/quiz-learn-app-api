@@ -85,8 +85,8 @@ class UserProgressController extends Controller
 
                 $enrollment->progress_percentage = $progressPercentage;
 
-                if ($progressPercentage === 100 && is_null($enrollment->end_date)) {
-                    $enrollment->end_date = now();
+                if ($progressPercentage === 100 && is_null($enrollment->completion_date)) {
+                    $enrollment->completion_date = now();
                 }
 
                 $enrollment->save();
@@ -148,8 +148,8 @@ class UserProgressController extends Controller
                     }
 
                     $enrollment->progress_percentage = $progressPercentage;
-                    if ($enrollment->end_date && $progressPercentage < 100) {
-                        $enrollment->end_date = null;
+                    if ($enrollment->completion_date && $progressPercentage < 100) {
+                        $enrollment->completion_date = null;
                     }
 
                     $enrollment->save();
@@ -208,7 +208,7 @@ class UserProgressController extends Controller
                         ->where('module_id', $moduleId)
                         ->update([
                             'progress_percentage' => 0,
-                            'end_date' => null,
+                            'completion_date' => null,
                         ]);
                 }
 

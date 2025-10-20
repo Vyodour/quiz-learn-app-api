@@ -55,7 +55,7 @@ class MidtransService
                 'payment_gateway_id' => $snapResponse->token,
                 'redirect_url' => $snapResponse->redirect_url,
                 'info' => [
-                    'message' => 'Silakan lanjutkan pembayaran melalui link redirect Midtrans.',
+                    'message' => 'Please continue the payment with Midtrans link.',
                     'midtrans_mode' => Config::$isProduction ? 'Production' : 'Sandbox'
                 ]
             ];
@@ -65,7 +65,7 @@ class MidtransService
                 'error' => $e->getMessage(),
                 'params' => $params
             ]);
-            throw new Exception("Gagal menghubungi Midtrans API: " . $e->getMessage());
+            throw new Exception("Failed to connect Midtrans API: " . $e->getMessage());
         }
     }
 }
