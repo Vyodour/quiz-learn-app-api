@@ -11,14 +11,38 @@ use App\Models\CodeChallenge;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\ResponseHelper;
+use App\Models\Module;
+use App\Models\UserCodeSubmission;
+use App\Models\Content;
 use Illuminate\Support\Facades\Auth;
 use Exception;
+use App\Http\Resources\UserDashboardResource;
 
 class UserProgressController extends Controller
 {
     public function __construct ()
     {
         $this->middleware('auth:sanctum');
+    }
+
+    private function calculateModuleProgressPercentage(Module $module, int $userId): int
+    {
+        $totalUnits = $module->contentUnitOrders()->count();
+
+        if ($totalUnits === 0) {
+            return 100;
+        }
+
+        $completedUnits = UserUnitProgress::where('user_id', $userId)
+            ->where('is_completed', true)
+            ->whereHas('unitOrder', function ($query) use ($module) {
+                 $query->whereHas('content', function ($q) use ($module) {
+                     $q->where('module_id', $module->id);
+                 });
+            })
+            ->count();
+
+        return min(100, round(($completedUnits / $totalUnits) * 100));
     }
 
     public function getDashboardStats(): JsonResponse
@@ -56,10 +80,9 @@ class UserProgressController extends Controller
                 ->where('user_id', $user->id)
                 ->avg('score') ?? 0;
             $averageQuizScore = round($averageQuizScore, 0);
-
             $moduleProgress = Module::with(['contents.orderedUnits.unitProgresses' => function ($query) use ($user) {
-                    $query->where('user_id', $user->id);
-                }])
+                $query->where('user_id', $user->id);
+            }])
                 ->get()
                 ->map(function ($module) {
                     $totalUnits = $module->contents->flatMap(fn ($content) => $content->orderedUnits)->count();
@@ -121,6 +144,7 @@ class UserProgressController extends Controller
             }
 
             DB::transaction(function () use ($user, $contentUnitOrder, &$progressPercentage) {
+                // 1. Mark unit as completed
                 UserUnitProgress::updateOrCreate(
                     [
                         'user_id' => $user->id,
@@ -146,22 +170,7 @@ class UserProgressController extends Controller
                     throw new \Exception('User is not enrolled in this module.');
                 }
 
-                $totalUnits = $module->contentUnitOrders()->count();
-
-                if ($totalUnits === 0) {
-                    $progressPercentage = 100;
-                } else {
-                    $completedUnits = UserUnitProgress::where('user_id', $user->id)
-                        ->where('is_completed', true)
-                        ->whereHas('unitOrder', function ($query) use ($module) {
-                             $query->whereHas('content', function ($q) use ($module) {
-                                $q->where('module_id', $module->id);
-                             });
-                        })
-                        ->count();
-
-                    $progressPercentage = min(100, round(($completedUnits / $totalUnits) * 100));
-                }
+                $progressPercentage = $this->calculateModuleProgressPercentage($module, $user->id);
 
                 $enrollment->progress_percentage = $progressPercentage;
 
@@ -210,24 +219,10 @@ class UserProgressController extends Controller
                         return;
                     }
 
-                    $totalUnits = $module->contentUnitOrders()->count();
-
-                    if ($totalUnits === 0) {
-                        $progressPercentage = 100;
-                    } else {
-                        $completedUnits = UserUnitProgress::where('user_id', $user->id)
-                            ->where('is_completed', true)
-                            ->whereHas('unitOrder', function ($query) use ($module) {
-                                 $query->whereHas('content', function ($q) use ($module) {
-                                    $q->where('module_id', $module->id);
-                                 });
-                            })
-                            ->count();
-
-                        $progressPercentage = min(100, round(($completedUnits / $totalUnits) * 100));
-                    }
+                    $progressPercentage = $this->calculateModuleProgressPercentage($module, $user->id);
 
                     $enrollment->progress_percentage = $progressPercentage;
+
                     if ($enrollment->completion_date && $progressPercentage < 100) {
                         $enrollment->completion_date = null;
                     }
@@ -284,19 +279,27 @@ class UserProgressController extends Controller
                      ->delete();
 
                 if ($moduleId) {
-                    UserModuleEnrollment::where('user_id', $targetUserId)
+                    $module = Module::find($moduleId);
+                    $enrollment = UserModuleEnrollment::where('user_id', $targetUserId)
                         ->where('module_id', $moduleId)
-                        ->update([
-                            'progress_percentage' => 0,
-                            'completion_date' => null,
-                        ]);
+                        ->first();
+
+                    if ($module && $enrollment) {
+                        $progressPercentage = $this->calculateModuleProgressPercentage($module, $targetUserId);
+
+                        $enrollment->progress_percentage = $progressPercentage;
+                        if ($enrollment->completion_date && $progressPercentage < 100) {
+                            $enrollment->completion_date = null;
+                        }
+                        $enrollment->save();
+                    }
                 }
 
                 return $count;
             });
 
             return ResponseHelper::success(
-                "{$deletedCount} progress records for Content ID: {$contentId} has been reset for User ID: {$targetUserId}. Module progress reset.",
+                "{$deletedCount} progress records for Content ID: {$contentId} has been reset for User ID: {$targetUserId}. Module progress updated.",
                 [
                     'content_id' => $contentId,
                     'user_id' => $targetUserId,

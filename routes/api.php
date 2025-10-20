@@ -64,9 +64,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/submit', [CodeChallengeController::class, 'submit']);
     });
 
-    Route::prefix('progress/units/{contentUnitOrder}')->controller(UserProgressController::class)->group(function () {
-        Route::post('/complete', 'completeUnit');
-        Route::post('/reset', 'resetUnit');
+    Route::prefix('progress')->controller(UserProgressController::class)->group(function () {
+        Route::get('/dashboard', 'getDashboardStats');
+
+        Route::prefix('units/{contentUnitOrder}')->group(function () {
+            Route::post('/complete', 'completeUnit');
+            Route::post('/reset', 'resetUnit');
+        });
     });
 
     Route::resource('plans', AdminPlanController::class)->only(['index', 'show']);
