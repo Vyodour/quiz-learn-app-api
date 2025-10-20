@@ -68,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', 'getDashboardStats');
 
         Route::prefix('units/{contentUnitOrder}')->group(function () {
+            Route::post('/quiz-submit', 'submitQuizAnswer');
             Route::post('/complete', 'completeUnit');
             Route::post('/reset', 'resetUnit');
         });

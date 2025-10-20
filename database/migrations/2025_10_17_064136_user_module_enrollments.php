@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('module_id')->constrained()->onDelete('cascade');
+            $table->unsignedTinyInteger('progress_percentage')->default(0);
             $table->timestamp('start_date')->nullable();
             $table->timestamp('completion_date')->nullable();
             $table->timestamps();

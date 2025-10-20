@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('quizzes_information', function (Blueprint $table) {
             $table->id();
 
-            $table->string('name')->comment('Nama atau deskripsi singkat Quiz.');
-            $table->integer('passing_score')->default(75)->comment('Nilai minimum kelulusan (0-100).');
-            $table->integer('time_limit')->nullable()->comment('Batas waktu pengerjaan dalam menit.');
+            $table->string('name');
+            $table->integer('passing_score')->default(75);
+            $table->integer('time_limit')->nullable();
 
             $table->timestamps();
         });

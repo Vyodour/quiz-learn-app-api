@@ -8,6 +8,7 @@ use App\Models\UserUnitProgress;
 use App\Models\UserModuleEnrollment;
 use App\Models\QuizInformation;
 use App\Models\CodeChallenge;
+use App\Models\UserQuizAttempt;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\ResponseHelper;
@@ -27,7 +28,9 @@ class UserProgressController extends Controller
 
     private function calculateModuleProgressPercentage(Module $module, int $userId): int
     {
-        $totalUnits = $module->contentUnitOrders()->count();
+        $totalUnits = ContentUnitOrder::whereHas('content', function ($query) use ($module) {
+            $query->where('module_id', $module->id);
+        })->count();
 
         if ($totalUnits === 0) {
             return 100;
@@ -124,6 +127,92 @@ class UserProgressController extends Controller
         }
     }
 
+    public function submitQuizAnswer(Request $request, ContentUnitOrder $contentUnitOrder): JsonResponse
+    {
+        $user = Auth::user();
+        $progressPercentage = 0;
+
+        try {
+            $request->validate([
+                'submitted_option_index' => 'required|integer|min:0',
+            ]);
+
+            if ($contentUnitOrder->ordered_unit_type !== QuizInformation::class) {
+                return ResponseHelper::error('This unit is not a quiz and cannot accept quiz answers.', 400);
+            }
+
+            if (!$contentUnitOrder->canBeAccessedByUser($user) || !$contentUnitOrder->isPreviousUnitCompleted($user)) {
+                return ResponseHelper::error('Unit cannot be accessed!', 403);
+            }
+
+            $quiz = $contentUnitOrder->orderedUnit;
+            $submittedIndex = $request->input('submitted_option_index');
+
+            if (!$quiz) {
+                return ResponseHelper::error('Quiz content not found.', 404);
+            }
+
+            $isCorrect = $submittedIndex == $quiz->correct_option_index;
+            $score = $isCorrect ? 100 : 0;
+            $passThreshold = 75;
+            $isPassed = $score >= $passThreshold;
+
+            DB::transaction(function () use ($user, $contentUnitOrder, $score, $isPassed, &$progressPercentage) {
+                UserQuizAttempt::create([
+                    'user_id' => $user->id,
+                    'quiz_information_id' => $contentUnitOrder->ordered_unit_id,
+                    'score' => $score,
+                    'is_passed' => $isPassed,
+                    'attempted_at' => now(),
+                ]);
+
+                if ($isPassed) {
+                    UserUnitProgress::updateOrCreate(
+                        [
+                            'user_id' => $user->id,
+                            'content_unit_order_id' => $contentUnitOrder->id,
+                        ],
+                        [
+                            'is_completed' => true,
+                            'completed_at' => now(),
+                        ]
+                    );
+                }
+
+                $module = $contentUnitOrder->content?->module;
+                if ($module) {
+                    $enrollment = UserModuleEnrollment::where('user_id', $user->id)
+                        ->where('module_id', $module->id)
+                        ->first();
+
+                    if ($enrollment) {
+                         $progressPercentage = $this->calculateModuleProgressPercentage($module, $user->id);
+                         $enrollment->progress_percentage = $progressPercentage;
+                         if ($progressPercentage === 100 && is_null($enrollment->completion_date)) {
+                             $enrollment->completion_date = now();
+                         }
+                         $enrollment->save();
+                    }
+                }
+            });
+
+            return ResponseHelper::success(
+                $isPassed ? 'Quiz completed successfully.' : 'Quiz failed. Please try again.',
+                [
+                    'unit_id' => $contentUnitOrder->id,
+                    'is_correct' => $isCorrect,
+                    'score' => $score,
+                    'is_completed' => $isPassed,
+                    'module_progress_percentage' => $progressPercentage,
+                ],
+                'quiz_submitted'
+            );
+
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to submit quiz answer. Error: ' . $e->getMessage(), 500);
+        }
+    }
+
     public function completeUnit(ContentUnitOrder $contentUnitOrder): JsonResponse
     {
         $user = Auth::user();
@@ -144,7 +233,6 @@ class UserProgressController extends Controller
             }
 
             DB::transaction(function () use ($user, $contentUnitOrder, &$progressPercentage) {
-                // 1. Mark unit as completed
                 UserUnitProgress::updateOrCreate(
                     [
                         'user_id' => $user->id,
