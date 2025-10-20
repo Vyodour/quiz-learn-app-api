@@ -15,7 +15,6 @@ class ContentUnitOrder extends Model
         'content_id',
         'order_number',
         'title',
-        'is_completed',
         'ordered_unit_type',
         'ordered_unit_id',
         'is_premium',

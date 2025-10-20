@@ -21,6 +21,86 @@ class UserProgressController extends Controller
         $this->middleware('auth:sanctum');
     }
 
+    public function getDashboardStats(): JsonResponse
+    {
+        $user = Auth::user();
+
+        try {
+            $totalUnits = ContentUnitOrder::count();
+
+            $completedUnitsCount = $user->unitProgresses()
+                ->where('is_completed', true)
+                ->count();
+
+            $overallCompletionPercentage = ($totalUnits > 0)
+                ? round(($completedUnitsCount / $totalUnits) * 100)
+                : 0;
+
+            $nextUnit = ContentUnitOrder::orderBy('order_number')
+                ->whereDoesntHave('unitProgresses', function ($query) use ($user) {
+                    $query->where('user_id', $user->id)->where('is_completed', true);
+                })
+                ->with('orderedUnit')
+                ->first();
+
+            $totalSubmissions = UserCodeSubmission::where('user_id', $user->id)->count();
+            $passedSubmissions = UserCodeSubmission::where('user_id', $user->id)
+                ->where('is_passed', true)
+                ->count();
+
+            $challengePassRate = ($totalSubmissions > 0)
+                ? round(($passedSubmissions / $totalSubmissions) * 100)
+                : 0;
+
+            $averageQuizScore = DB::table('user_quiz_attempts')
+                ->where('user_id', $user->id)
+                ->avg('score') ?? 0;
+            $averageQuizScore = round($averageQuizScore, 0);
+
+            $moduleProgress = Module::with(['contents.orderedUnits.unitProgresses' => function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                }])
+                ->get()
+                ->map(function ($module) {
+                    $totalUnits = $module->contents->flatMap(fn ($content) => $content->orderedUnits)->count();
+                    $completedUnits = $module->contents->flatMap(fn ($content) => $content->orderedUnits)
+                        ->filter(fn ($unit) => $unit->unitProgresses->isNotEmpty() && $unit->unitProgresses->first()->is_completed)
+                        ->count();
+
+                    $completionPercentage = ($totalUnits > 0)
+                        ? round(($completedUnits / $totalUnits) * 100)
+                        : 0;
+
+                    return [
+                        'module_id' => $module->id,
+                        'title' => $module->title,
+                        'completion_percentage' => $completionPercentage,
+                        'total_units' => $totalUnits,
+                    ];
+                });
+
+
+            $dashboardStats = [
+                'overall_completion_percentage' => $overallCompletionPercentage,
+                'completed_units_count' => $completedUnitsCount,
+                'total_units_count' => $totalUnits,
+                'next_unit' => $nextUnit,
+                'code_challenge_pass_rate' => $challengePassRate,
+                'average_quiz_score' => $averageQuizScore,
+                'module_progress' => $moduleProgress,
+            ];
+
+            return ResponseHelper::success(
+                'Dashboard statistics fetched successfully.',
+                new UserDashboardResource($dashboardStats),
+                'dashboard_stats'
+            );
+
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to fetch dashboard statistics. Error: ' . $e->getMessage(), 500);
+        }
+    }
+
     public function completeUnit(ContentUnitOrder $contentUnitOrder): JsonResponse
     {
         $user = Auth::user();
