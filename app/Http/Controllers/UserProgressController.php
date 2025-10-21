@@ -9,6 +9,8 @@ use App\Models\UserModuleEnrollment;
 use App\Models\QuizInformation;
 use App\Models\CodeChallenge;
 use App\Models\UserQuizAttempt;
+use App\Models\QuizQuestion;
+use App\Models\UserQuizAnswer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\ResponseHelper;
@@ -83,9 +85,13 @@ class UserProgressController extends Controller
                 ->where('user_id', $user->id)
                 ->avg('score') ?? 0;
             $averageQuizScore = round($averageQuizScore, 0);
-            $moduleProgress = Module::with(['contents.orderedUnits.userProgresses' => function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            }])
+
+            $enrolledModuleIds = UserModuleEnrollment::where('user_id', $user->id)->pluck('module_id');
+
+            $moduleProgress = Module::whereIn('id', $enrolledModuleIds)
+                ->with(['contents.orderedUnits.userProgresses' => function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                }])
                 ->get()
                 ->map(function ($module) {
                     $totalUnits = $module->contents->flatMap(fn ($content) => $content->orderedUnits)->count();
@@ -104,7 +110,6 @@ class UserProgressController extends Controller
                         'total_units' => $totalUnits,
                     ];
                 });
-
 
             $dashboardStats = [
                 'overall_completion_percentage' => $overallCompletionPercentage,
@@ -127,44 +132,97 @@ class UserProgressController extends Controller
         }
     }
 
-    public function submitQuizAnswer(Request $request, ContentUnitOrder $contentUnitOrder): JsonResponse
+   public function submitQuiz(Request $request, ContentUnitOrder $contentUnitOrder): JsonResponse
     {
         $user = Auth::user();
         $progressPercentage = 0;
 
         try {
-            $request->validate([
-                'submitted_option_index' => 'required|integer|min:0',
-            ]);
-
             if ($contentUnitOrder->ordered_unit_type !== QuizInformation::class) {
-                return ResponseHelper::error('This unit is not a quiz and cannot accept quiz answers.', 400);
+                return ResponseHelper::error('This unit is not a quiz and cannot accept batch answers.', 400);
             }
 
             if (!$contentUnitOrder->canBeAccessedByUser($user) || !$contentUnitOrder->isPreviousUnitCompleted($user)) {
                 return ResponseHelper::error('Unit cannot be accessed!', 403);
             }
 
-            $quiz = $contentUnitOrder->orderedUnit;
-            $submittedIndex = $request->input('submitted_option_index');
+            $request->validate([
+                'answers' => ['required', 'array', 'min:1'],
+                'answers.*.quiz_question_id' => ['required', 'exists:quiz_questions,id'],
+                'answers.*.submitted_option_index' => ['required', 'integer', 'min:0'],
+            ]);
 
-            if (!$quiz) {
+            $quizInfo = $contentUnitOrder->orderedUnit;
+            if (!$quizInfo) {
                 return ResponseHelper::error('Quiz content not found.', 404);
             }
 
-            $isCorrect = $submittedIndex == $quiz->correct_option_index;
-            $score = $isCorrect ? 100 : 0;
-            $passThreshold = 75;
-            $isPassed = $score >= $passThreshold;
+            $submittedAnswers = $request->input('answers');
+            $totalQuestions = $quizInfo->quizQuestions()->count();
+            $correctAnswersCount = 0;
+            $userAnswersToInsert = [];
 
-            DB::transaction(function () use ($user, $contentUnitOrder, $score, $isPassed, &$progressPercentage) {
-                UserQuizAttempt::create([
+            if (count($submittedAnswers) != $totalQuestions) {
+                 return ResponseHelper::error('Please answers all ' . $totalQuestions . ' quiz questions.', 400);
+            }
+
+            foreach ($submittedAnswers as $answerData) {
+                $questionId = $answerData['quiz_question_id'];
+                $submittedIndex = $answerData['submitted_option_index'];
+
+                $question = QuizQuestion::find($questionId);
+
+                if (!$question || $question->quiz_information_id !== $quizInfo->id) {
+                    continue;
+                }
+
+                $isCorrect = ($question->correct_option_index == $submittedIndex);
+                if ($isCorrect) {
+                    $correctAnswersCount++;
+                }
+
+                $userAnswersToInsert[] = [
                     'user_id' => $user->id,
-                    'quiz_information_id' => $contentUnitOrder->ordered_unit_id,
-                    'score' => $score,
-                    'is_passed' => $isPassed,
-                    'attempted_at' => now(),
-                ]);
+                    'quiz_question_id' => $questionId,
+                    'submitted_option_index' => $submittedIndex,
+                    'is_correct' => $isCorrect,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            $scorePercentage = $totalQuestions > 0 ? ($correctAnswersCount / $totalQuestions) * 100 : 0;
+            $isPassed = ($scorePercentage >= $quizInfo->passing_score);
+
+            $resultMessage = $isPassed
+                ? 'Quiz finished and **PASSED** with score ' . round($scorePercentage) . '%!'
+                : 'Quiz finished, but **FAILED** with score ' . round($scorePercentage) . '% (Needed ' . $quizInfo->passing_score . '%).';
+
+            DB::transaction(function () use ($user, $contentUnitOrder, $quizInfo, $scorePercentage, $isPassed, $userAnswersToInsert, &$progressPercentage) {
+
+                $questionIds = collect($userAnswersToInsert)->pluck('quiz_question_id');
+                UserQuizAnswer::where('user_id', $user->id)
+                    ->whereIn('quiz_question_id', $questionIds)
+                    ->delete();
+                UserQuizAnswer::insert($userAnswersToInsert);
+
+                UserQuizAttempt::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'quiz_information_id' => $quizInfo->id,
+                    ],
+                    [
+                        'score' => round($scorePercentage),
+                        'is_passed' => $isPassed,
+                        'submitted_answers' => json_encode(collect($userAnswersToInsert)->map(function($item) {
+                            return [
+                                'question_id' => $item['quiz_question_id'],
+                                'submitted_index' => $item['submitted_option_index']
+                            ];
+                        })),
+                        'attempted_at' => now(),
+                    ]
+                );
 
                 if ($isPassed) {
                     UserUnitProgress::updateOrCreate(
@@ -184,32 +242,32 @@ class UserProgressController extends Controller
                     $enrollment = UserModuleEnrollment::where('user_id', $user->id)
                         ->where('module_id', $module->id)
                         ->first();
-
                     if ($enrollment) {
-                         $progressPercentage = $this->calculateModuleProgressPercentage($module, $user->id);
-                         $enrollment->progress_percentage = $progressPercentage;
-                         if ($progressPercentage === 100 && is_null($enrollment->completion_date)) {
-                             $enrollment->completion_date = now();
-                         }
-                         $enrollment->save();
+                        $progressPercentage = $this->calculateModuleProgressPercentage($module, $user->id);
+                        $enrollment->progress_percentage = $progressPercentage;
+                        if ($progressPercentage === 100 && is_null($enrollment->completion_date)) {
+                            $enrollment->completion_date = now();
+                        }
+                        $enrollment->save();
                     }
                 }
             });
 
             return ResponseHelper::success(
-                $isPassed ? 'Quiz completed successfully.' : 'Quiz failed. Please try again.',
+                $resultMessage,
                 [
                     'unit_id' => $contentUnitOrder->id,
-                    'is_correct' => $isCorrect,
-                    'score' => $score,
                     'is_completed' => $isPassed,
+                    'score_percentage' => round($scorePercentage, 2),
+                    'correct_count' => $correctAnswersCount,
+                    'total_questions' => $totalQuestions,
                     'module_progress_percentage' => $progressPercentage,
                 ],
                 'quiz_submitted'
             );
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Failed to submit quiz answer. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to submit quiz. Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -225,11 +283,32 @@ class UserProgressController extends Controller
 
             $unitType = $contentUnitOrder->ordered_unit_type;
 
-            if ($unitType === QuizInformation::class) {
-                return ResponseHelper::error('This is a quiz. Please send your answer.', 400);
+           if ($unitType === QuizInformation::class) {
+                $quizInfo = $contentUnitOrder->orderedUnit;
+                if ($quizInfo) {
+                    $lastAttempt = UserQuizAttempt::where('user_id', $user->id)
+                                ->where('quiz_information_id', $quizInfo->id)
+                                ->latest()
+                                ->first();
+
+                    if (!$lastAttempt || !$lastAttempt->is_passed) {
+                         return ResponseHelper::error('This is a quiz. Please submit all your answers and pass the quiz first.', 400);
+                    }
+                }
             }
             if ($unitType === CodeChallenge::class) {
-                return ResponseHelper::error('This is a code submission. Please send your submission.', 400);
+                 $challenge = $contentUnitOrder->orderedUnit;
+                 if ($challenge) {
+                    $lastSubmission = UserCodeSubmission::where('user_id', $user->id)
+                                    ->where('code_challenge_id', $challenge->id)
+                                    ->where('is_passed', true)
+                                    ->latest()
+                                    ->first();
+
+                    if (!$lastSubmission) {
+                        return ResponseHelper::error('This is a code challenge. Please send your submission and pass all tests first.', 400);
+                    }
+                 }
             }
 
             DB::transaction(function () use ($user, $contentUnitOrder, &$progressPercentage) {
@@ -293,10 +372,23 @@ class UserProgressController extends Controller
                     ->delete();
 
                 if ($deleted) {
+                    if ($contentUnitOrder->ordered_unit_type === QuizInformation::class) {
+                        $quizInfo = $contentUnitOrder->orderedUnit;
+                        if ($quizInfo) {
+                            $questionIds = QuizQuestion::where('quiz_information_id', $quizInfo->id)->pluck('id');
+                            UserQuizAnswer::where('user_id', $user->id)
+                                ->whereIn('quiz_question_id', $questionIds)
+                                ->delete();
+                            UserQuizAttempt::where('user_id', $user->id)
+                                ->where('quiz_information_id', $quizInfo->id)
+                                ->delete();
+                        }
+                    }
+
                     $module = $contentUnitOrder->content?->module;
 
                     if (!$module) {
-                        throw new \Exception('Module data could not be retrieved for reset.');
+                         throw new \Exception('Module data could not be retrieved for reset.');
                     }
 
                     $enrollment = UserModuleEnrollment::where('user_id', $user->id)
@@ -361,10 +453,25 @@ class UserProgressController extends Controller
             $moduleId = $content?->module_id;
 
 
-            $deletedCount = DB::transaction(function () use ($targetUserId, $unitIds, $moduleId) {
+            $deletedCount = DB::transaction(function () use ($targetUserId, $unitIds, $moduleId, $contentId) {
                  $count = UserUnitProgress::where('user_id', $targetUserId)
                      ->whereIn('content_unit_order_id', $unitIds)
                      ->delete();
+
+                     $quizInfoIds = ContentUnitOrder::whereIn('id', $unitIds)
+                                    ->where('ordered_unit_type', QuizInformation::class)
+                                    ->pluck('ordered_unit_id');
+
+                if ($quizInfoIds->isNotEmpty()) {
+                    $questionIds = QuizQuestion::whereIn('quiz_information_id', $quizInfoIds)->pluck('id');
+                    UserQuizAnswer::where('user_id', $targetUserId)
+                        ->whereIn('quiz_question_id', $questionIds)
+                        ->delete();
+
+                    UserQuizAttempt::where('user_id', $targetUserId)
+                        ->whereIn('quiz_information_id', $quizInfoIds)
+                        ->delete();
+                 }
 
                 if ($moduleId) {
                     $module = Module::find($moduleId);
