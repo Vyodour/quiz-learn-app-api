@@ -12,7 +12,6 @@ class ModuleSummaryResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'name' => $this->name,
             'order_number' => $this->order_number,
             'duration_minutes' => $this->duration,
         ];
