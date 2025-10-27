@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\UserUnitProgress;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
@@ -59,7 +60,16 @@ public function getActiveSubscription(): ?Subscription
 
 public function userProgresses(): HasMany
     {
-        return $this->hasMany(UserUnitProgress::class);
+        return $this->hasMany(UserUnitProgress::class, 'user_id');
     }
 
+    public function unitProgress(): HasMany
+    {
+        return $this->hasMany(UserUnitProgress::class, 'user_id');
+    }
+
+    public function quizAttempts(): HasMany
+    {
+        return $this->hasMany(UserQuizAttempt::class, 'user_id');
+    }
 }

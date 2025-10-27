@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\User;
 
 class ContentUnitOrder extends Model
 {
@@ -71,5 +72,22 @@ class ContentUnitOrder extends Model
             ->first();
 
         return (bool)($progress && $progress->is_completed);
+    }
+
+    public function isAccessible(User $user): bool
+    {
+        if (!$this->content->isAccessible($user)) {
+            return false;
+        }
+
+        if (!$this->isPreviousUnitCompleted($user)) {
+            return false;
+        }
+
+        if (!$this->canBeAccessedByUser($user)) {
+            return false;
+        }
+
+        return true;
     }
 }

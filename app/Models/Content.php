@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\User;
 
 class Content extends Model
 {
@@ -33,7 +34,7 @@ class Content extends Model
             return true;
         }
 
-        $completedCount = $user->unitProgresses()
+        $completedCount = $user->userProgresses()
             ->whereIn('content_unit_order_id', $unitIds)
             ->where('is_completed', true)
             ->count();
@@ -52,5 +53,17 @@ class Content extends Model
         }
 
         return $previousContent->isCompletedByUser($user);
+    }
+    public function isAccessible(User $user): bool
+    {
+        if (!$this->module->isPreviousModuleCompleted($user)) {
+            return false;
+        }
+
+        if (!$this->isPreviousContentCompleted($user)) {
+            return false;
+        }
+
+        return true;
     }
 }
