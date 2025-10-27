@@ -17,6 +17,23 @@ use Exception;
 
 class ContentController extends Controller
 {
+    public function index(Module $module): JsonResponse
+    {
+        try {
+            $contents = Content::where('module_id', $module->id)
+            ->orderBy('order_number')
+            ->get();
+
+            return ResponseHelper::success(
+                'Content list fetched by module.',
+                ContentResource::collection($contents),
+                'contents'
+            );
+        } catch (Exception $e) {
+            return ResponseHelper::error('Failed to fetch content list. Error: ' . $e->getMessage(), 500);
+        }
+    }
+
     public function show(Content $content): JsonResponse
     {
         try {
@@ -35,7 +52,7 @@ class ContentController extends Controller
         }
     }
 
-    public function store(StoreParentContentRequest $request, Module $module): JsonResponse 
+    public function store(StoreParentContentRequest $request, Module $module): JsonResponse
     {
         try {
             $result = DB::transaction(function () use ($request, $module) {

@@ -26,25 +26,6 @@ class ContentUnitController extends Controller
         'challenge' => CodeChallenge::class,
     ];
 
-    public function index(Content $content): JsonResponse
-    {
-        try {
-            $orderedUnits = $content->orderedUnits()
-                                     ->with('orderedUnit')
-                                     ->orderBy('order_number')
-                                     ->get();
-
-            return ResponseHelper::success(
-                'Content Units Fetched Successfully',
-                ContentUnitOrderResource::collection($orderedUnits),
-                'ordered_units'
-            );
-
-        } catch (Exception $e) {
-            return ResponseHelper::error('Failed to Fetch Content Units. Error: ' . $e->getMessage(), 500);
-        }
-    }
-
     public function show(Content $content, ContentUnitOrder $orderedUnit): JsonResponse
     {
         $user = Auth::user();

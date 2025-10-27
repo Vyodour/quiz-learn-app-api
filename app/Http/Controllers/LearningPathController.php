@@ -19,7 +19,7 @@ class LearningPathController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $learningPaths = LearningPath::all();
+            $learningPaths = LearningPath::withCount('modules')->get();
 
             $resource = LearningPathResource::collection($learningPaths);
 
