@@ -18,13 +18,13 @@ class QuizQuestionController extends Controller
             $questions = $quizInformation->questions()->get();
 
             return ResponseHelper::success(
-                'Pertanyaan Quiz Berhasil Diambil.',
+                'Quiz question taken.',
                 QuizQuestionResource::collection($questions),
                 'questions'
             );
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal mengambil pertanyaan Quiz. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to take question. Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -38,27 +38,27 @@ class QuizQuestionController extends Controller
         ]);
 
         if ($validatedData['correct_option_index'] >= count($validatedData['options'])) {
-             return ResponseHelper::error('Indeks jawaban benar tidak valid.', 422);
+             return ResponseHelper::error('Answer not validated!.', 422);
         }
 
         try {
             $question = $quizInformation->questions()->create($validatedData);
 
             return ResponseHelper::success(
-                'Pertanyaan berhasil ditambahkan.',
+                'Question has created.',
                 new QuizQuestionResource($question),
                 'question',
                 201
             );
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal membuat pertanyaan. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to create question. Error: ' . $e->getMessage(), 500);
         }
     }
 
     public function update(Request $request, QuizInformation $quizInformation, QuizQuestion $quizQuestion): JsonResponse
     {
         if ($quizQuestion->quiz_information_id !== $quizInformation->id) {
-            return ResponseHelper::error('Pertanyaan tidak ditemukan dalam Quiz ini.', 404);
+            return ResponseHelper::error('Question not found!.', 404);
         }
 
         $validatedData = $request->validate([
@@ -69,11 +69,11 @@ class QuizQuestionController extends Controller
         ]);
 
         if ($request->has(['options', 'correct_option_index']) && $validatedData['correct_option_index'] >= count($validatedData['options'])) {
-             return ResponseHelper::error('Indeks jawaban benar tidak valid.', 422);
+             return ResponseHelper::error('Answer not validated!.', 422);
         }
         if ($request->has('correct_option_index') && !$request->has('options')) {
             if ($validatedData['correct_option_index'] >= count($quizQuestion->options)) {
-                return ResponseHelper::error('Indeks jawaban benar melebihi jumlah opsi yang ada.', 422);
+                return ResponseHelper::error('Answers are too many.Only 4 can be accepted!.', 422);
             }
         }
 
@@ -82,19 +82,19 @@ class QuizQuestionController extends Controller
             $quizQuestion->update($validatedData);
 
             return ResponseHelper::success(
-                'Pertanyaan berhasil diperbarui.',
+                'Question has been updated.',
                 new QuizQuestionResource($quizQuestion),
                 'question'
             );
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal memperbarui pertanyaan. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to update question. Error: ' . $e->getMessage(), 500);
         }
     }
 
 public function updateOption(Request $request, QuizInformation $quizInformation, QuizQuestion $quizQuestion): JsonResponse
 {
     if ($quizQuestion->quiz_information_id !== $quizInformation->id) {
-        return ResponseHelper::error('Pertanyaan tidak ditemukan dalam Quiz ini.', 404);
+        return ResponseHelper::error('Question not found!.', 404);
     }
 
     $validated = $request->validate([
@@ -105,7 +105,7 @@ public function updateOption(Request $request, QuizInformation $quizInformation,
     $options = $quizQuestion->options;
 
     if (!isset($options[$validated['index']])) {
-        return ResponseHelper::error('Index opsi tidak valid.', 422);
+        return ResponseHelper::error('Option not validated!.', 422);
     }
 
     $options[$validated['index']] = $validated['option'];
@@ -114,27 +114,27 @@ public function updateOption(Request $request, QuizInformation $quizInformation,
         $quizQuestion->update(['options' => $options]);
 
         return ResponseHelper::success(
-            'Opsi pertanyaan berhasil diperbarui.',
+            'Option has beem updated.',
             new QuizQuestionResource($quizQuestion),
             'question'
         );
     } catch (Exception $e) {
-        return ResponseHelper::error('Gagal memperbarui opsi. Error: ' . $e->getMessage(), 500);
+        return ResponseHelper::error('Failed to update option!. Error: ' . $e->getMessage(), 500);
     }
 }
 
     public function destroy(QuizInformation $quizInformation, QuizQuestion $quizQuestion): JsonResponse
     {
         if ($quizQuestion->quiz_information_id !== $quizInformation->id) {
-            return ResponseHelper::error('Pertanyaan tidak ditemukan dalam Quiz ini.', 404);
+            return ResponseHelper::error('Question not found!.', 404);
         }
 
         try {
             $quizQuestion->delete();
-            return ResponseHelper::success('Pertanyaan berhasil dihapus.', null);
+            return ResponseHelper::success('Question has been deleted.', null);
 
         } catch (Exception $e) {
-            return ResponseHelper::error('Gagal menghapus pertanyaan. Error: ' . $e->getMessage(), 500);
+            return ResponseHelper::error('Failed to delete question!. Error: ' . $e->getMessage(), 500);
         }
     }
 }
